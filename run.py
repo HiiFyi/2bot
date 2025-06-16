@@ -1,5 +1,3 @@
-import eventlet
-eventlet.monkey_patch()
 import os
 import logging
 from app import app
