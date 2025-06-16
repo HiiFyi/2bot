@@ -12,7 +12,7 @@ if __name__ == "__main__":
     try:
         os.makedirs(SUPERVISOR_LOG_DIR, exist_ok=True)
         schedule_cronjobs()
-        port = int(os.environ.get("PORT", 5000))
+        port = int(os.environ.get("PORT", 8000))
         socketio.run(
             app,
             host="0.0.0.0",
