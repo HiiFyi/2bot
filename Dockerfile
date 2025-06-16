@@ -2,8 +2,15 @@ FROM mysterysd/wzmlx:v3
 
 WORKDIR /usr/src/app
 RUN chmod 777 /usr/src/app
-RUN uv venv --system-site-packages
 
+ENV SUPERVISORD_CONF_DIR=/etc/supervisor/conf.d
+ENV SUPERVISORD_LOG_DIR=/var/log/supervisor
+
+RUN mkdir -p ${SUPERVISORD_CONF_DIR} \
+    ${SUPERVISORD_LOG_DIR} \
+    /usr/src/app
+    
+RUN uv venv --system-site-packages
 ENV VENV_PATH=/opt/venv
 RUN python3 -m venv $VENV_PATH
 ENV PATH="$VENV_PATH/bin:$PATH"
