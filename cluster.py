@@ -7,8 +7,8 @@ def run_update():
     subprocess.run(["python3", "update.py"])
 
 def run_gunicorn():
-    port = os.environ.get("PORT", 5000)
-    subprocess.run(["gunicorn", "-w", "1", "-k", "eventlet", "-b", f"0.0.0.0:{os.environ.get('PORT', '5000')}", "run:app"], check=True)
+    port = os.environ.get("PORT", 8000)
+    subprocess.run(["gunicorn", "-w", "1", "-k", "gevent", "-b", f"0.0.0.0:{os.environ.get('PORT', '8000')}", "run:app"], check=True)
 
 def run_supervisord():
     subprocess.run(["supervisord", "-n", "-c", "supervisord.conf"])
