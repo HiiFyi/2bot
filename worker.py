@@ -40,20 +40,6 @@ def generate_prefix():
     logging.info(f'Generated prefix: {prefix}')
     return prefix
 
-def get_pyenv_python(version):
-    major_minor = '.'.join(version.split('.')[:2])
-    shim = shutil.which(f"python{major_minor}")
-    if shim:
-        return shim
-    logging.warning(f"pyenv shim python{major_minor} not found in PATH. Falling back to 'python3'.")
-    return shutil.which("python3") or "python3"
-
-def run_with_pyenv(version, command_args, **kwargs):
-    env = os.environ.copy()
-    env["PYENV_VERSION"] = version
-    kwargs["env"] = env
-    return subprocess.run(command_args, **kwargs)
-    
 def validate_config(clusters):
     required_keys = ['bot_number', 'git_url', 'branch', 'run_command']
     seen_bot_suffixes = set()
@@ -82,7 +68,7 @@ def validate_config(clusters):
 
     logging.info("Configuration validation successful.")
     return True
-    
+
 async def cleanup_logs(log_dir='/var/log/supervisor', log_pattern='*_out.log', err_pattern='*_err.log', interval_hours=24):
     while True:
         try:
@@ -99,7 +85,6 @@ async def cleanup_logs(log_dir='/var/log/supervisor', log_pattern='*_out.log', e
 
 def load_config(file_path):
     logging.info(f'Loading configuration from {file_path}')
-    
     try:
         with open(file_path, "r") as jsonfile:
             config = json.load(jsonfile)
@@ -110,7 +95,6 @@ def load_config(file_path):
     clusters = []
     for cluster in config.get('clusters', []):
         details_str = os.getenv(cluster['name'], '{}')
-        
         try:
             details = json.loads(details_str)
             if not isinstance(details, list) or len(details) < 4:
@@ -128,10 +112,8 @@ def load_config(file_path):
                 "branch": details[2],
                 "run_command": details[3],
                 "env": details[4] if len(details) > 4 and isinstance(details[4], dict) else {},
-                "python_version": details[5] if len(details) > 5 else None,
                 "cron": cron_value
             })
-
         except json.JSONDecodeError:
             logging.error(f"Error decoding JSON for {cluster['name']}, skipping.")
             continue
@@ -166,44 +148,27 @@ def write_supervisord_config(cluster, command):
 
 def _prepare_bot_dir(cluster):
     bot_dir = Path('/app') / cluster['bot_number'].replace(" ", "_")
-    venv_dir = bot_dir / 'venv'
     requirements_file = bot_dir / 'requirements.txt'
     branch = cluster.get('branch', 'main')
-    
+
     if bot_dir.exists():
         logging.info(f'Removing existing directory: {bot_dir}')
         shutil.rmtree(bot_dir)
-    
+
     logging.info(f'Cloning {cluster["bot_number"]} from {cluster["git_url"]} (branch: {branch})')
     subprocess.run(['git', 'clone', '-b', branch, '--single-branch', cluster['git_url'], str(bot_dir)], check=True)
-    version = cluster.get("python_version")
-    if version:
-        python_executable = get_pyenv_python(version)
-    else:
-        python_executable = shutil.which("python3") or "python3"
-        
     if requirements_file.exists():
-        logging.info(f'Creating virtual environment for {cluster["bot_number"]} using {python_executable}')
-        if version:
-            run_with_pyenv(version, [python_executable, '-m', 'venv', str(venv_dir)], check=True)
-            pip_command = [str(venv_dir / 'bin' / 'pip'), 'install', '--no-cache-dir', '-r', str(requirements_file)]
-            run_with_pyenv(version, pip_command, check=True)
-        else:
-             subprocess.run([python_executable, '-m', 'venv', str(venv_dir)], check=True)
-             pip_command = [str(venv_dir / 'bin' / 'pip'), 'install', '--no-cache-dir', '-r', str(requirements_file)]
-             subprocess.run(pip_command, check=True)
-                
+        logging.info(f'Installing requirements for {cluster["bot_number"]} using system python3')
+        subprocess.run(['python3', '-m', 'pip', 'install', '--no-cache-dir', '-r', str(requirements_file)], check=True)
+
 async def start_bot(cluster):
     logging.info(f'Starting bot: {cluster["bot_number"]}')
     bot_dir = Path('/app') / cluster['bot_number'].replace(" ", "_")
-    venv_dir = bot_dir / 'venv'
     bot_file = bot_dir / cluster['run_command']
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _prepare_bot_dir, cluster)
 
-    python_executable = venv_dir / 'bin' / 'python3'
-    if cluster.get('python_version'):
-        python_executable = venv_dir / 'bin' / f'python{cluster["python_version"]}'
+    python_executable = 'python3'
 
     if bot_file.suffix == ".sh":
         command = f"bash {bot_file}"
@@ -268,11 +233,11 @@ async def wait_for_process_stop(bot_conf_name, timeout=30, interval=2):
 async def stop_bot(bot_number):
     logging.info(f"Stopping bot: {bot_number}")
     bot_conf_name = bot_number.replace(" ", "_")
-    
+
     await async_supervisorctl(f"supervisorctl stop {bot_conf_name}")
     if not await wait_for_process_stop(bot_conf_name):
         logging.warning(f"Process {bot_conf_name} did not stop within timeout.")
-    
+
     conf_path = Path(SUPERVISORD_CONF_DIR) / f"{bot_conf_name}.conf"
     if conf_path.exists():
         conf_path.unlink()
