@@ -1,6 +1,3 @@
-import eventlet
-eventlet.monkey_patch()
-
 import os
 import signal
 import subprocess
@@ -33,7 +30,7 @@ app.config['SECRET_KEY'] = os.urandom(24)
 
 socketio = SocketIO(
     app,
-    async_mode='eventlet',
+    async_mode='gevent',
     cors_allowed_origins="*",
     ping_timeout=60,
     ping_interval=25
