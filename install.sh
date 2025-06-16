@@ -7,7 +7,7 @@ usage() {
 }
 
 APT_PACKAGES="nano"
-PIP_PACKAGES="croniter python-dateutil apscheduler"
+PIP_PACKAGES="croniter python-dateutil apscheduler flask-socketio==5.5.1 eventlet==0.33.1 dnspython==2.2.1 asyncio gevent gunicorn flask==2.0.1 requests schedule supervisor aiofiles watchdog psutil python-dotenv python-socketio==5.12.0 python-engineio==4.11.0 Werkzeug==2.2.2"
 
 echo "[INFO] Starting install.sh script"
 
